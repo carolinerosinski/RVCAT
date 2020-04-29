@@ -95,6 +95,7 @@ biomass.props<-aggregate(biomass4$Ind.Prop, by=list(Predator=biomass4$Predator, 
 biomass.props2<-cast(biomass.props, Prey~Site+Predator, value='Mean.Prop')
 write.xlsx(biomass.props2, here('Plots and Tables','StanRock_SupShoal_LT_AvgBiomass.xlsx'), row.names = F)
 
+
 ##to calculate the averages for both sites combined
 biomass.both<-cast(biomass2, FishRecord+Predator~Prey, value='PreyWT_g',fun.aggregate = 'sum')
 biomass.both[is.na(biomass.both)]<-0
@@ -113,6 +114,52 @@ biomass.both.props2<-cast(biomass.both.props, Prey~Predator, value='Mean.Prop')
 totals.check<-aggregate(biomass.props$Mean.Prop, by=list(Predator=biomass.props$Predator,
                                                          Site=biomass.props$Site), FUN=sum)
 
+##Percent Occurrence Calculations
+biomass5<-biomass4
+biomass5$Prey<-gsub('aquatic invertebrate_adult insect','aquatic invertebrate_aquatic invertebrate', biomass5$Prey)
+perc.occ1<-subset(biomass5, value>0)
+perc.occ<-aggregate(perc.occ1$FishRecord, by=list(Predator=perc.occ1$Predator, Site=perc.occ1$Site,
+                                                 Prey=perc.occ1$Prey), FUN=length)%>%
+  renameCol('x','N.fish.wpreytype')
+
+perc.occ<-merge.data.frame(perc.occ, sample.size)
+perc.occ<-merge.data.frame(perc.occ, n.empty)
+perc.occ$N.stom.full<-perc.occ$SampleSize-perc.occ$Number.Empty
+perc.occ$Percent.Occurrence<-(perc.occ$N.fish.wpreytype/perc.occ$N.stom.full)*100
+perc.occ<-cast(perc.occ, Prey~Predator+Site, value='Percent.Occurrence')
+perc.occ[is.na(perc.occ)]<-0
+
+write.xlsx(perc.occ, here('Plots and Tables','SS_SR_LT_percent_occurrence.xlsx'), row.names = F)
+
+##Percent Occurrence for both sites together
+perc.occ.2sites<-aggregate(perc.occ1$FishRecord, by=list(Predator=perc.occ1$Predator, 
+                                                         Prey=perc.occ1$Prey), FUN=length)%>%
+  renameCol('x','N.fish.wpreytype')
+sample.size.spp<-data.frame(Predator=c('humper lake trout','lean lake trout','redfin lake trout',
+                                       'siscowet lake trout'), Sample.Size=c(52,57,45,136))
+perc.occ.2sites<-merge.data.frame(perc.occ.2sites, sample.size.spp)
+perc.occ.2sites$Percent.Occurrence<-(perc.occ.2sites$N.fish.wpreytype/perc.occ.2sites$Sample.Size)*100
+perc.occ.2sites<-cast(perc.occ.2sites, Prey~Predator, value='Percent.Occurrence')
+perc.occ.2sites[is.na(perc.occ.2sites)]<-0
+
+write.xlsx(perc.occ.2sites, here('Plots and Tables','2Shoals_LT_percent_occurrence.xlsx'), row.names = F)
+
+##prey types summary stats
+prey.types<-subset(biomass4, value>0)
+n.prey.types.perind<-aggregate(prey.types$Prey, by=list(FishRecord=prey.types$FishRecord,
+                                                        Predator=prey.types$Predator,
+                                                        Site=prey.types$Site), FUN=length)%>%
+  renameCol('x','N.preytypes.perind')
+
+##for SS and SR separate
+prey.types.summary<-n.prey.types.perind%>%
+  group_by(Site,Predator)%>%
+  summarise(mean=mean(N.preytypes.perind), max=max(N.preytypes.perind))
+
+##for both shoals together
+prey.types.summary2<-n.prey.types.perind%>%
+  group_by(Predator)%>%
+  summarise(mean=mean(N.preytypes.perind), max=max(N.preytypes.perind))
 ##SCHOENER'S CALCULATIONS
 stan.rock.props<-select(biomass.props2, c(2:4))
 sup.shoal.props<-select(biomass.props2, c(5:8))
