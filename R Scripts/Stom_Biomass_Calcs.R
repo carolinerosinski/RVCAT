@@ -81,6 +81,7 @@ biomass2<-select(biomass, c(1:3,6,7))
 biomass3<-cast(biomass2, FishRecord+Predator+Site~Prey, value='PreyWT_g', fun.aggregate = 'sum')
 biomass3[is.na(biomass3)]<-0
 biomass4<-melt(biomass3, id=c('FishRecord','Predator','Site'))
+write.xlsx(biomass4, here('Plots and Tables/SR_SS_LKTR','SR_SS_individual_prey.xlsx'), row.names=F)
 
 ind.totals<-aggregate(biomass4$value, by=list(FishRecord=biomass4$FishRecord), FUN=sum) %>%
   renameCol('x','Ind.Total')
@@ -93,7 +94,7 @@ biomass.props<-aggregate(biomass4$Ind.Prop, by=list(Predator=biomass4$Predator, 
   renameCol('x','Mean.Prop')
 
 biomass.props2<-cast(biomass.props, Prey~Site+Predator, value='Mean.Prop')
-write.xlsx(biomass.props2, here('Plots and Tables','StanRock_SupShoal_LT_AvgBiomass.xlsx'), row.names = F)
+write.xlsx(biomass.props2, here('Plots and Tables/SR_SS_LKTR','StanRock_SupShoal_LT_AvgBiomass.xlsx'), row.names = F)
 
 
 ##to calculate the averages for both sites combined
@@ -109,10 +110,27 @@ biomass.both.props<-aggregate(biomass.both2$Ind.Prop, by=list(Predator=biomass.b
                                                               Prey=biomass.both2$Prey), FUN=mean)%>%
   renameCol('x','Mean.Prop')
 biomass.both.props2<-cast(biomass.both.props, Prey~Predator, value='Mean.Prop')
+write.xlsx(biomass.both.props2,here('Plots and Tables/SR_SS_LKTR','biomass_bothshoals.xlsx'), row.names = F)
 
 ##totals check to make sure all species/sites proportions sum to 1
 totals.check<-aggregate(biomass.props$Mean.Prop, by=list(Predator=biomass.props$Predator,
                                                          Site=biomass.props$Site), FUN=sum)
+
+##sum prey counts by individual for data export
+counts<-sr.ss%>%
+  filter(Empty=='N')%>%
+  select(c('FishRecord','Predator','Site','Prey2','Prey3','PreyCount'))
+counts<-subset(counts, Prey2=='aquatic invertebrate'|Prey2=='terrestrial invertebrate'|
+                  Prey2=='fish eggs'|Prey2=='fish')
+
+counts$Prey<-paste(counts$Prey2, counts$Prey3, sep='_')
+counts2<-select(counts, c(1:3,6,7))
+counts3<-cast(counts2, FishRecord+Predator+Site~Prey, value='PreyCount', fun.aggregate = 'sum')
+counts3[is.na(counts3)]<-0
+counts4<-melt(counts3, id=c('FishRecord','Predator','Site'))
+counts4<-renameCol(counts4, 'value','PreyCount')
+write.xlsx(counts4, here('Plots and Tables/SR_SS_LKTR','SR_SS_individual_prey_count.xlsx'), row.names=F)
+
 
 ##Percent Occurrence Calculations
 biomass5<-biomass4
@@ -129,7 +147,7 @@ perc.occ$Percent.Occurrence<-(perc.occ$N.fish.wpreytype/perc.occ$N.stom.full)*10
 perc.occ<-cast(perc.occ, Prey~Predator+Site, value='Percent.Occurrence')
 perc.occ[is.na(perc.occ)]<-0
 
-write.xlsx(perc.occ, here('Plots and Tables','SS_SR_LT_percent_occurrence.xlsx'), row.names = F)
+write.xlsx(perc.occ, here('Plots and Tables/SR_SS_LKTR','SS_SR_LT_percent_occurrence.xlsx'), row.names = F)
 
 ##Percent Occurrence for both sites together
 perc.occ.2sites<-aggregate(perc.occ1$FishRecord, by=list(Predator=perc.occ1$Predator, 
@@ -142,10 +160,47 @@ perc.occ.2sites$Percent.Occurrence<-(perc.occ.2sites$N.fish.wpreytype/perc.occ.2
 perc.occ.2sites<-cast(perc.occ.2sites, Prey~Predator, value='Percent.Occurrence')
 perc.occ.2sites[is.na(perc.occ.2sites)]<-0
 
-write.xlsx(perc.occ.2sites, here('Plots and Tables','2Shoals_LT_percent_occurrence.xlsx'), row.names = F)
+write.xlsx(perc.occ.2sites, here('Plots and Tables/SR_SS_LKTR','2Shoals_LT_percent_occurrence.xlsx'), row.names = F)
+
+
+##to calculate % occurrence of fish and invertebrates (combo of all sub-types)
+fish.invert<-data.frame(Prey2=c('aquatic invertebrate','fish','fish eggs','terrestrial invertebrate'),
+                        fish.invert=c('invert','fish','fish eggs','invert'))
+fish.invert<-merge.data.frame(fish.invert, biomass)
+fish.invert$fish.invert<-as.character(fish.invert$fish.invert)
+fish.invert<-fish.invert%>%
+  filter(fish.invert!='fish eggs')%>%
+  select('FishRecord','fish.invert', 'Predator','Site','PreyWT_g')
+fish.invert2<-aggregate(fish.invert$PreyWT_g, by=list(FishRecord=fish.invert$FishRecord,
+                                                     Site=fish.invert$Site,
+                                                     fish.invert=fish.invert$fish.invert,
+                                                     Predator=fish.invert$Predator), FUN=sum)
+fish.invert.perc<-aggregate(fish.invert2$FishRecord, by=list(fish.invert=fish.invert2$fish.invert,
+                                                            Site=fish.invert2$Site,
+                                                            Predator=fish.invert2$Predator), FUN=length)%>%
+  renameCol('x','N.Fish.wprey')
+fish.invert.perc<-merge.data.frame(fish.invert.perc, sample.size)
+fish.invert.perc<-merge.data.frame(fish.invert.perc, n.empty)
+fish.invert.perc$Full.samplesize<-fish.invert.perc$SampleSize-fish.invert.perc$Number.Empty
+fish.invert.perc$Perc.Occ<-(fish.invert.perc$N.Fish.wprey/fish.invert.perc$Full.samplesize)*100
+
+fish.invert.perc<-cast(fish.invert.perc, fish.invert~Predator+Site, value='Perc.Occ')
+
+##all fish and all inverts perc. occ. for both sites combined
+fish.invert.both<-aggregate(fish.invert$PreyWT_g, by=list(FishRecord=fish.invert$FishRecord,
+                                                      fish.invert=fish.invert$fish.invert,
+                                                      Predator=fish.invert$Predator), FUN=sum)
+fish.invert.perc.both<-aggregate(fish.invert.both$FishRecord, by=list(fish.invert=fish.invert.both$fish.invert,
+                                                             Predator=fish.invert.both$Predator), FUN=length)%>%
+  renameCol('x','N.Fish.wprey')
+fish.invert.perc.both<-merge.data.frame(fish.invert.perc.both, sample.size.spp)
+fish.invert.perc.both$Perc.Occ<-(fish.invert.perc.both$N.Fish.wprey/fish.invert.perc.both$Sample.Size)*100
+
+fish.invert.perc.both<-cast(fish.invert.perc.both, fish.invert~Predator, value='Perc.Occ')
+
 
 ##prey types summary stats
-prey.types<-subset(biomass4, value>0)
+prey.types<-subset(biomass5, value>0)
 n.prey.types.perind<-aggregate(prey.types$Prey, by=list(FishRecord=prey.types$FishRecord,
                                                         Predator=prey.types$Predator,
                                                         Site=prey.types$Site), FUN=length)%>%
@@ -160,6 +215,17 @@ prey.types.summary<-n.prey.types.perind%>%
 prey.types.summary2<-n.prey.types.perind%>%
   group_by(Predator)%>%
   summarise(mean=mean(N.preytypes.perind), max=max(N.preytypes.perind))
+
+##number unique prey types
+unique.prey<-aggregate(prey.types$value, by=list(Predator=prey.types$Predator,Site=prey.types$Site,
+                                                 Prey=prey.types$Prey), FUN=sum)
+unique.prey<-aggregate(unique.prey$Prey, by=list(Predator=unique.prey$Predator, Site=unique.prey$Site),
+                       FUN=length)
+unique.prey.both<-aggregate(prey.types$value, by=list(Predator=prey.types$Predator,
+                                                 Prey=prey.types$Prey), FUN=sum)
+unique.prey.both<-aggregate(unique.prey.both$Prey, by=list(Predator=unique.prey.both$Predator),
+                       FUN=length)
+
 ##SCHOENER'S CALCULATIONS
 stan.rock.props<-select(biomass.props2, c(2:4))
 sup.shoal.props<-select(biomass.props2, c(5:8))
@@ -233,3 +299,30 @@ is.ss.redfin.wictnw<-WTcMC(is.ss.redfin, replicates=10000, print.ris=TRUE)
 
 is.ss.siscowet.wictnw<-WTcMC(is.ss.siscowet, replicates=10000, print.ris=TRUE)
 is.sr.siscowet.wictnw<-WTcMC(is.sr.siscowet, replicates=10000, print.ris=TRUE)
+
+
+##Marascuilo Procedure Attempt
+sr.mp<-select(biomass.props2, c(1:4))
+sr.mp$h_l<-abs(sr.mp$`Stannard Rock_humper lake trout`-sr.mp$`Stannard Rock_lean lake trout`)
+sr.mp$l_s<-abs(sr.mp$`Stannard Rock_lean lake trout`-sr.mp$`Stannard Rock_siscowet lake trout`)
+sr.mp$h_s<-abs(sr.mp$`Stannard Rock_humper lake trout`-sr.mp$`Stannard Rock_siscowet lake trout`)
+
+
+###THIS CODE WAS ONLINE FOR SOMEONE ELSE'S PROJECT. I HAVE NOT DONE ANYTHING PAST THIS POINT
+##CODE AND SOME MINIMAL INSTRUCTIONS ARE FROM HERE: https://www.itl.nist.gov/div898/handbook/prc/section4/prc474.htm
+## Set the proportions of interest.
+p = c(0.120, 0.153, 0.140, 0.210, 0.127)
+N = length(p)
+value = critical.range = c()
+
+## Compute critical values.
+for (i in 1:(N-1))
+{ for (j in (i+1):N)
+{
+  value = c(value,(abs(p[i]-p[j])))
+  critical.range = c(critical.range,
+                     sqrt(qchisq(.95,4))*sqrt(p[i]*(1-p[i])/300 + p[j]*(1-p[j])/300))
+}
+}
+
+round(cbind(value,critical.range),3)
