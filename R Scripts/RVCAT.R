@@ -1425,6 +1425,53 @@ os.total<-aggregate(os.total$x, by=list(YEAR=os.total$YEAR), FUN=mean)%>%
   renameCol('x','Mean Total Biomass')
 
 os.table<-merge.data.frame(os.table, os.total)
+
+os.summary<-select(os, c(4,8,29,35))
+os.unique.sites<-os.sites.byyear%>% ##to calculate the number of sites sampled during the nearshore cruise each year
+  group_by(YEAR)%>%
+  dplyr::count('LOCATION')%>%
+  select(c(1,3))%>%
+  renameCol('n','Sites')
+os.total.biomass<-aggregate(os.summary$KGHA, by=list(YEAR=os.summary$YEAR, LOCATION=os.summary$LOCATION), FUN=sum)%>% 
+  renameCol('x', 'SiteSum')
+os.zero.sites<-subset(os.total.biomass, SiteSum==0) ##to calculate the number of sites where no fish were caught
+os.zero.sites<-os.zero.sites%>%
+  group_by(YEAR)%>%
+  dplyr::count()%>%
+  renameCol('n','No fish sites')
+os.years<-data.frame(YEAR=c(2011:max(os$YEAR)))
+os.zero.sites<-merge.data.frame(os.zero.sites, os.years, all=T)
+os.zero.sites[is.na(os.zero.sites)]<-0
+os.total.biomass2<-aggregate(os.total.biomass$SiteSum, by=list(YEAR=os.total.biomass$YEAR), FUN=mean)%>% ##mean total biomass
+  renameCol('x','Total biomass')
+os.median.biomass<-aggregate(os.total.biomass$SiteSum, by=list(YEAR=os.total.biomass$YEAR), FUN=median)%>% ##median total biomass
+  renameCol('x','Median biomass')
+os.spp.count<-merge.data.frame(os.summary, sci.names) ##to calculate the mean biomass of various common species
+os.spp.count<-select(os.spp.count, c(2:5))%>%
+  renameCol('COMMON_NAME','SPECIES')
+os.spp.count<-merge.data.frame(os.spp.count, os.sites.byyear, by=c('YEAR','LOCATION'), all=T)
+os.spp.count<-cast(os.spp.count, YEAR+LOCATION+SITECHECK~SPECIES, value='KGHA', fun.aggregate='mean')
+os.spp.count[is.na(os.spp.count)]<-0
+os.spp.count<-select(os.spp.count, c(1, 4:20))
+os.spp.count2<-aggregate(.~YEAR, os.spp.count, FUN=mean)
+
+os.num<-select(os, c(4,8,29,30))
+os.tot.spp.caught<-subset(os.num, NUM>0) ##calculate the total number of species caught each year
+os.tot.spp.caught$spp2<-as.numeric(as.character(os.tot.spp.caught$SPECIES))
+os.tot.spp.caught<-subset(os.tot.spp.caught, spp2<999)
+os.tot.spp.caught<-select(os.tot.spp.caught, c(1,3))
+os.tot.spp.caught<-unique(os.tot.spp.caught)
+os.tot.spp.caught<-aggregate(os.tot.spp.caught$SPECIES, by=list(YEAR=os.tot.spp.caught$YEAR), FUN=length)%>%
+  renameCol('x','Total species collected')
+
+os.stats<-merge.data.frame(os.unique.sites, os.zero.sites)
+os.stats<-merge.data.frame(os.stats,os.tot.spp.caught )
+os.stats<-merge.data.frame(os.stats, os.total.biomass2)
+os.stats<-merge.data.frame(os.stats, os.median.biomass)
+
+os.table<-merge.data.frame(os.table, os.stats)
+os.table<-select(os.table,c('YEAR','Sites','No fish sites','Total species collected','Total biomass',
+                            'Median biomass','Kiyi','Deepwater Sculpin','siscowet Lake Trout'))
 ##spp means
 os.means<-os.spp.compare.mean%>%
   group_by(COMMON_NAME)%>%
@@ -2555,10 +2602,11 @@ ns.all.present<-filter(ns.all.complete, NUM>0)
 os.all.present<-filter(os.all.complete, NUM>0)
 
 library(openxlsx)
+metadata<-read.xlsx(here('Data','ns_os_all_MetaData.xlsx'))
 list.sheets<-list('Nearshore_Zeros'=ns.all.complete, 'Offshore_Zeros'=os.all.complete,
                   'Nearshore_NoZeros'=ns.all.present, 'Offshore_NoZeros'=os.all.present,
                   'Effort_CurrentYear'=effort.all, 'Age-1_Fish'=age1.table, "NS_table"=ns.table,
-                  'OS_Table'=os.table)
+                  'OS_Table'=os.table,'MetaData'=metadata)
 
 openxlsx::write.xlsx(list.sheets, here('Plots and Tables/RVCAT','ns_os_all.xlsx'))
 ####################################################################################
