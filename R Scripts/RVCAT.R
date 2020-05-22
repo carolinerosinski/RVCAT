@@ -1410,7 +1410,21 @@ os.spp.compare.mean<-os.spp.compare3%>%
 
 ##merge to get species names
 os.spp.compare.mean<-merge.data.frame(os.spp.compare.mean, codes.to.names, all=F)
+os.table<-select(os.spp.compare.mean, c('SPECIES','YEAR','mean'))
+os.table<-cast(os.table, YEAR~SPECIES, value='mean')
+os.table<-os.table%>%
+  renameCol('206','Kiyi')%>%
+  renameCol('308','siscowet Lake Trout')%>%
+  renameCol('904','Deepwater Sculpin')
 
+os.cast<-cast(os, YEAR+LOCATION~SPECIES, value='KGHA')
+os.cast[is.na(os.cast)]<-0
+os.cast<-melt(os.cast, id=c('YEAR','LOCATION'))
+os.total<-aggregate(os.cast$value, by=list(YEAR=os.cast$YEAR, LOCATION=os.cast$LOCATION), FUN=sum)
+os.total<-aggregate(os.total$x, by=list(YEAR=os.total$YEAR), FUN=mean)%>% 
+  renameCol('x','Mean Total Biomass')
+
+os.table<-merge.data.frame(os.table, os.total)
 ##spp means
 os.means<-os.spp.compare.mean%>%
   group_by(COMMON_NAME)%>%
@@ -2473,6 +2487,80 @@ animate(p, fps = 4, nframes=200, width = 1024, height = 512, renderer=gifski_ren
 anim_save(here("Plots and Tables/RVCAT",'Animated_ns_bar_race.gif'))
 
 
+##DATA EXPORT ALL SPECIES, YEARS, SITES
+os<-subset(all.data, TARGET==118|TARGET==117 & YEAR>2010)%>%
+  filter(TR_DESIGN==25|TR_DESIGN==4)%>%
+  filter(END_DEPTH>84)
+
+ns<-subset(all.data, TARGET==2 & YEAR>1977)
+
+
+ns.all<-select(ns, c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,TR_DESIGN,
+                     BEG_DEPTH,END_DEPTH,SPECIES,HA_SWEPT,NUM,NOHA,KGHA))
+ns.all.num<-cast(ns.all, OP_ID+OP_DATE+TIME+YEAR+TARGET+LOCATION+Mid.Lat.DD+Mid.Long.DD+TR_DESIGN+
+               BEG_DEPTH+END_DEPTH+HA_SWEPT~SPECIES, value='NUM')
+ns.all.num[is.na(ns.all.num)]<-0
+ns.all.noha<-cast(ns.all, OP_ID+OP_DATE+TIME+YEAR+TARGET+LOCATION+Mid.Lat.DD+Mid.Long.DD+TR_DESIGN+
+                    BEG_DEPTH+END_DEPTH+HA_SWEPT~SPECIES, value='NOHA')
+ns.all.noha[is.na(ns.all.noha)]<-0
+ns.all.kgha<-cast(ns.all, OP_ID+OP_DATE+TIME+YEAR+TARGET+LOCATION+Mid.Lat.DD+Mid.Long.DD+TR_DESIGN+
+                    BEG_DEPTH+END_DEPTH+HA_SWEPT~SPECIES, value='KGHA')
+ns.all.kgha[is.na(ns.all.kgha)]<-0
+
+ns.all.num2<-melt(ns.all.num, id=c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,
+                                   TR_DESIGN,BEG_DEPTH,END_DEPTH,HA_SWEPT))
+ns.all.num2<-renameCol(ns.all.num2, 'value','NUM')
+ns.all.noha2<-melt(ns.all.noha, id=c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,
+                                    TR_DESIGN,BEG_DEPTH,END_DEPTH,HA_SWEPT))
+ns.all.noha2<-renameCol(ns.all.noha2, 'value','NOHA')
+ns.all.kgha2<-melt(ns.all.kgha, id=c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,
+                                     TR_DESIGN,BEG_DEPTH,END_DEPTH,HA_SWEPT))
+ns.all.kgha2<-renameCol(ns.all.kgha2, 'value','KGHA')
+
+ns.all.complete<-merge.data.frame(ns.all.num2, ns.all.noha2)
+ns.all.complete<-merge.data.frame(ns.all.complete, ns.all.kgha2)
+ns.all.complete<-filter(ns.all.complete, SPECIES !=0)
+ns.all.complete<-filter(ns.all.complete, SPECIES !=999)
+ns.all.complete<-merge.data.frame(ns.all.complete, sci.names)
+
+os.all<-select(os, c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,TR_DESIGN,
+                     BEG_DEPTH,END_DEPTH,SPECIES,HA_SWEPT,NUM,NOHA,KGHA))
+os.all.num<-cast(os.all, OP_ID+OP_DATE+TIME+YEAR+TARGET+LOCATION+Mid.Lat.DD+Mid.Long.DD+TR_DESIGN+
+                   BEG_DEPTH+END_DEPTH+HA_SWEPT~SPECIES, value='NUM')
+os.all.num[is.na(os.all.num)]<-0
+os.all.noha<-cast(os.all, OP_ID+OP_DATE+TIME+YEAR+TARGET+LOCATION+Mid.Lat.DD+Mid.Long.DD+TR_DESIGN+
+                    BEG_DEPTH+END_DEPTH+HA_SWEPT~SPECIES, value='NOHA')
+os.all.noha[is.na(os.all.noha)]<-0
+os.all.kgha<-cast(os.all, OP_ID+OP_DATE+TIME+YEAR+TARGET+LOCATION+Mid.Lat.DD+Mid.Long.DD+TR_DESIGN+
+                    BEG_DEPTH+END_DEPTH+HA_SWEPT~SPECIES, value='KGHA')
+os.all.kgha[is.na(os.all.kgha)]<-0
+
+os.all.num2<-melt(os.all.num, id=c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,
+                                   TR_DESIGN,BEG_DEPTH,END_DEPTH,HA_SWEPT))
+os.all.num2<-renameCol(os.all.num2, 'value','NUM')
+os.all.noha2<-melt(os.all.noha, id=c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,
+                                     TR_DESIGN,BEG_DEPTH,END_DEPTH,HA_SWEPT))
+os.all.noha2<-renameCol(os.all.noha2, 'value','NOHA')
+os.all.kgha2<-melt(os.all.kgha, id=c(OP_ID,OP_DATE,TIME,YEAR,TARGET,LOCATION,Mid.Lat.DD,Mid.Long.DD,
+                                     TR_DESIGN,BEG_DEPTH,END_DEPTH,HA_SWEPT))
+os.all.kgha2<-renameCol(os.all.kgha2, 'value','KGHA')
+
+os.all.complete<-merge.data.frame(os.all.num2, os.all.noha2)
+os.all.complete<-merge.data.frame(os.all.complete, os.all.kgha2)
+os.all.complete<-filter(os.all.complete, SPECIES !=0)
+os.all.complete<-filter(os.all.complete, SPECIES !=999)
+os.all.complete<-merge.data.frame(os.all.complete, sci.names)
+
+ns.all.present<-filter(ns.all.complete, NUM>0)
+os.all.present<-filter(os.all.complete, NUM>0)
+
+library(openxlsx)
+list.sheets<-list('Nearshore_Zeros'=ns.all.complete, 'Offshore_Zeros'=os.all.complete,
+                  'Nearshore_NoZeros'=ns.all.present, 'Offshore_NoZeros'=os.all.present,
+                  'Effort_CurrentYear'=effort.all, 'Age-1_Fish'=age1.table, "NS_table"=ns.table,
+                  'OS_Table'=os.table)
+
+openxlsx::write.xlsx(list.sheets, here('Plots and Tables/RVCAT','ns_os_all.xlsx'))
 ####################################################################################
 ##Sankey Diagram Nearshore Offshore Fish Collections#########################################
 ## USING network3D Package
